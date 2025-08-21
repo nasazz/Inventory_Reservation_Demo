@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # SQL Server
+  sqlserver:
+    container_name: inventory-db
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+    ports:
+      - "1433:1433"
+    volumes:
+      - inventory_data:/var/opt/mssql
+    networks:
+      - inventory-network
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -N -C -Q 'SELECT 1'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Backend API
+  backend:
+    container_name: inventory-server
+    build:
+      context: .
+      dockerfile: src/Api/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=Inventory;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+    ports:
+      - "5211:80"
+    restart: always
+    networks:
+      - inventory-network
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  # Frontend Angular app
+  frontend:
+    container_name: inventory-frontend
+    build:
+      context: .
+      dockerfile: frontend/docker/dev/Dockerfile
+      args:
+        - ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+    ports:
+      - "4200:80"
+    restart: always
+    networks:
+      - inventory-network
+    depends_on:
+      - backend
+
+networks:
+  inventory-network:
+    name: inventory-network
+    driver: bridge
+
+volumes:
+  inventory_data:
+    name: inventory_data

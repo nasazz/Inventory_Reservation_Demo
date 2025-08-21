@@ -50,7 +50,7 @@ namespace InventoryReservation.Api.Middleware
                     title = "Bad request";
                     break;
                 case InvalidOperationException:
-                    code = HttpStatusCode.Conflict; // business rule violation
+                    code = HttpStatusCode.Conflict; 
                     title = "Conflict";
                     break;
             }

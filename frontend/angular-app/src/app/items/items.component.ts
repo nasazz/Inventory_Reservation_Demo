@@ -83,7 +83,7 @@ export class ItemsComponent implements OnInit {
     });
   }
 
-  // New helper methods for dashboard stats
+
   getTotalInventory(): number {
     return this.items.reduce((sum, item) => sum + item.quantityOnHand, 0);
   }
