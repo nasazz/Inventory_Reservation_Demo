@@ -4,6 +4,7 @@ using InventoryReservation.Infrastructure.Repositories;
 using InventoryReservation.Application.Interfaces;
 using MediatR;
 using FluentValidation.AspNetCore;
+using InventoryReservation.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,7 +28,10 @@ builder.Services.AddDbContext<AppDbContext>(opts => opts.UseSqlServer(conn));
 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 
 // MediatR: scans Application assembly for handlers
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<InventoryReservation.Application.Commands.CreateItem.CreateItemCommandHandler>());
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(
+    typeof(InventoryReservation.Application.Commands.CreateItem.CreateItemCommandHandler).Assembly,
+    typeof(InventoryReservation.Infrastructure.Persistence.AppDbContext).Assembly
+));
 
 var app = builder.Build();
 
@@ -38,6 +42,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseMiddleware<ExceptionMiddleware>();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 app.UseAuthorization();
 app.MapControllers();
 
