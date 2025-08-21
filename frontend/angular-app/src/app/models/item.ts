@@ -4,5 +4,5 @@ export interface InventoryItem {
   name: string;
   quantityOnHand: number;
   reservedQuantity: number;
-  available: number; // optional convenience
+  available: number; 
 }

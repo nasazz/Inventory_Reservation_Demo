@@ -33,7 +33,20 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(
     typeof(InventoryReservation.Infrastructure.Persistence.AppDbContext).Assembly
 ));
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowLocalhost", policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
+
+
+app.UseCors("AllowLocalhost");
 
 if (app.Environment.IsDevelopment())
 {
