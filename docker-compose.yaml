@@ -1,0 +1,79 @@
+services:
+  sqlserver:
+    container_name: inventory_reservation_demo-sqlserver
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${SA_PASSWORD}
+    ports:
+      - "14331:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - inventory_network
+
+  backend:
+    container_name: inventory_reservation_demo-backend
+    build:
+      context: ./src
+      dockerfile: Api/Dockerfile
+    ports:
+      - "5211:80"
+    environment:
+      - ASPNETCORE_URLS=http://+:80
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION}
+    networks:
+      - inventory_network
+    depends_on:
+      - sqlserver
+
+  migrate:
+    image: mcr.microsoft.com/dotnet/sdk:9.0
+    volumes:
+      - ./src:/app/src
+    working_dir: /app/src
+    environment:
+      - ConnectionStrings__DefaultConnection=${DB_CONNECTION}
+    entrypoint: >
+      bash -c "
+        export PATH=\"$$PATH:/root/.dotnet/tools\" &&
+        dotnet tool install --global dotnet-ef --version 9.0.0 --ignore-failed-sources || true &&
+        export PATH=\"$$PATH:/root/.dotnet/tools\" &&
+        cd /app/src &&
+        dotnet restore Api/Api.csproj ||
+          (echo 'dotnet restore failed' && exit 1) &&
+        for i in $(seq 1 30); do
+          echo \"Attempt $i to run EF migrations...\";
+          dotnet ef database update --project Infrastructure/Infrastructure.csproj --startup-project Api/Api.csproj && exit 0;
+          echo 'Waiting for SQL Server to become available...';
+          sleep 2;
+        done;
+        echo 'Migration failed after retries' >&2;
+        exit 1
+      "
+    networks:
+      - inventory_network
+    depends_on:
+      - sqlserver
+
+  frontend:
+    container_name: inventory_reservation_demo-frontend
+    build:
+      context: ./frontend
+      dockerfile: docker/dev/Dockerfile
+    ports:
+      - "4200:4200"
+    networks:
+      - inventory_network
+    depends_on:
+      - backend
+
+networks:
+  inventory_network:
+    name: inventory_reservation_demo_network
+    driver: bridge
+
+volumes:
+  sqlserver_data:
+    name: inventory_reservation_demo_sqlserver_data
