@@ -8,31 +8,28 @@ using InventoryReservation.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
-// Add services
+// Services
 builder.Services.AddControllers()
     .AddFluentValidation(cfg => cfg.RegisterValidatorsFromAssemblyContaining<InventoryReservation.Application.Commands.CreateItem.CreateItemCommandValidator>());
-
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// DbContext - use environment variable for connection string
+// DbContext
 var conn = builder.Configuration.GetConnectionString("DefaultConnection")
            ?? "Server=localhost;Database=Inventory;Trusted_Connection=True;";
 builder.Services.AddDbContext<AppDbContext>(opts => opts.UseSqlServer(conn));
 
-
-
 // DI for repository
 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 
-// MediatR: scans Application assembly for handlers
+// MediatR
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblies(
     typeof(InventoryReservation.Application.Commands.CreateItem.CreateItemCommandHandler).Assembly,
     typeof(InventoryReservation.Infrastructure.Persistence.AppDbContext).Assembly
 ));
 
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost", policy =>
@@ -43,9 +40,15 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Kestrel: Listen on all interfaces inside container
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(80);
+});
+
 var app = builder.Build();
 
-
+// Middleware
 app.UseCors("AllowLocalhost");
 
 if (app.Environment.IsDevelopment())
@@ -54,21 +57,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-app.UseMiddleware<ExceptionMiddleware>();
+// Disable HTTPS redirection in Docker/dev
+// app.UseHttpsRedirection();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseMiddleware<ExceptionMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-
-
-
-
-
-

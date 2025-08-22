@@ -1,16 +1,19 @@
-# Development Dockerfile for Frontend
-FROM node:20-alpine AS build
+# Development Dockerfile for Angular frontend
+FROM node:20-alpine
+
 WORKDIR /app
 
-# Copy package.json and install dependencies
-COPY frontend/angular-app/package*.json ./
+# Copy package.json + lock first for caching
+COPY angular-app/package*.json ./
+
 RUN npm install
 
-# Copy the rest of the application
-COPY frontend/angular-app/ ./
+# Copy rest of Angular app
+COPY angular-app/ ./
 
-# Expose port
+# Expose dev server port
 EXPOSE 4200
 
-# Start the application in development mode
-CMD ["npm", "start", "--", "--host", "0.0.0.0"]
+CMD ["npx", "ng", "serve", "--host", "0.0.0.0", "--port", "4200", "--disable-host-check"]
+
+
