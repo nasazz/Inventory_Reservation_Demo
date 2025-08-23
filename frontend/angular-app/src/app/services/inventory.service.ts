@@ -16,23 +16,23 @@ export class InventoryService {
     return this.http.get<InventoryItem[]>(this.api);
   }
 
-  get(id: string) {
+  get(id: string): Observable<InventoryItem> {
     return this.http.get<InventoryItem>(`${this.api}/${id}`);
   }
 
-  create(payload: { id: string; sku: string; name: string; quantityOnHand: number }) {
+  create(payload: { id: string; sku: string; name: string; quantityOnHand: number }): Observable<{ id: string }> {
     return this.http.post<{ id: string }>(this.api, payload);
   }
 
-  reserve(id: string, quantity: number) {
+  reserve(id: string, quantity: number): Observable<any> {
     return this.http.post(`${this.api}/${id}/reserve`, { quantity });
   }
 
-  adjust(id: string, delta: number) {
+  adjust(id: string, delta: number): Observable<any> {
     return this.http.post(`${this.api}/${id}/adjust`, { delta });
   }
 
-  cancel(id: string, quantity: number) {
+  cancel(id: string, quantity: number): Observable<any> {
     return this.http.post(`${this.api}/${id}/cancel`, { quantity });
   }
 }
