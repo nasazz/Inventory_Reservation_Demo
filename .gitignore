@@ -68,3 +68,7 @@ yarn-error.log*
 # System Files
 .DS_Store
 Thumbs.db
+
+
+# Ignore Angular environment files
+frontend/angular-app/src/environments/

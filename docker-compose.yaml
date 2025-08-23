@@ -3,14 +3,20 @@ services:
     container_name: inventory_reservation_demo-sqlserver
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=${SA_PASSWORD}
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "Password123!"
     ports:
-      - "14331:1433"
+      - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     networks:
       - inventory_network
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "Password123!", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   backend:
     container_name: inventory_reservation_demo-backend
@@ -20,31 +26,36 @@ services:
     ports:
       - "5211:80"
     environment:
-      - ASPNETCORE_URLS=http://+:80
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=${DB_CONNECTION}
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=InventoryDb;User=sa;Password=Password123!;TrustServerCertificate=true;"
     networks:
       - inventory_network
     depends_on:
-      - sqlserver
+      sqlserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s 
 
   migrate:
     image: mcr.microsoft.com/dotnet/sdk:9.0
     volumes:
-      - ./src:/app/src
-    working_dir: /app/src
+      - ./src:/app
+    working_dir: /app
     environment:
-      - ConnectionStrings__DefaultConnection=${DB_CONNECTION}
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=InventoryDb;User=sa;Password=Password123!;TrustServerCertificate=true;
     entrypoint: >
       bash -c "
-        export PATH=\"$$PATH:/root/.dotnet/tools\" &&
-        dotnet tool install --global dotnet-ef --version 9.0.0 --ignore-failed-sources || true &&
-        export PATH=\"$$PATH:/root/.dotnet/tools\" &&
-        cd /app/src &&
-        dotnet restore Api/Api.csproj ||
-          (echo 'dotnet restore failed' && exit 1) &&
-        for i in $(seq 1 30); do
-          echo \"Attempt $i to run EF migrations...\";
+        # Install EF tool and add to PATH
+        export PATH=\"$$PATH:/root/.dotnet/tools\"
+        dotnet tool install --global dotnet-ef --version 9.0.0
+        
+        # Wait for SQL Server to be ready
+        for i in {1..30}; do
+          echo \"Attempt $$i to run EF migrations...\";
           dotnet ef database update --project Infrastructure/Infrastructure.csproj --startup-project Api/Api.csproj && exit 0;
           echo 'Waiting for SQL Server to become available...';
           sleep 2;
@@ -55,25 +66,25 @@ services:
     networks:
       - inventory_network
     depends_on:
-      - sqlserver
+      sqlserver:
+        condition: service_healthy
 
   frontend:
     container_name: inventory_reservation_demo-frontend
     build:
-      context: ./frontend
-      dockerfile: docker/dev/Dockerfile
+      context: ./frontend/angular-app
+      dockerfile: ../docker/prod/Dockerfile.prod
     ports:
-      - "4200:4200"
+      - "8080:80"
     networks:
       - inventory_network
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 networks:
   inventory_network:
-    name: inventory_reservation_demo_network
     driver: bridge
 
 volumes:
   sqlserver_data:
-    name: inventory_reservation_demo_sqlserver_data
